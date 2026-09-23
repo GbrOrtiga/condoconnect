@@ -1,0 +1,63 @@
+@media (max-width: 768px) {
+  :root { --radius-md: 12px; }
+
+  .container { width: min(calc(100% - 28px), var(--content-width)); }
+  .nav-bar { gap: 14px; min-height: 68px; }
+  .mobile-menu { display: block; margin-left: auto; }
+  .nav-links, .nav-actions { display: none; }
+  .nav-bar.is-open { flex-wrap: wrap; }
+  .nav-bar.is-open .nav-links, .nav-bar.is-open .nav-actions { display: flex; width: 100%; }
+  .nav-bar.is-open .nav-links { align-items: stretch; flex-direction: column; gap: 0; order: 3; }
+  .nav-bar.is-open .nav-links a { border-top: 1px solid var(--color-border); padding: 12px 0; }
+  .nav-bar.is-open .nav-actions { padding-bottom: 14px; }
+  .hero { padding: 52px 0 54px; }
+  .hero h1 { font-size: clamp(2.35rem, 13vw, 3.7rem); }
+  .hero-copy { font-size: 1rem; }
+  .search-box { align-items: stretch; flex-wrap: wrap; }
+  .search-icon { padding: 10px 10px 10px 12px; }
+  .search-box input { flex-basis: calc(100% - 48px); }
+  .search-box .button { margin-top: 5px; width: 100%; }
+  .hero-visual { min-height: 295px; }
+  .hero-card-main { height: 270px; inset: 14px 25px 14px 5px; }
+  .hero-card-art { height: 155px; }
+  .hero-card-float { bottom: 0; width: 200px; }
+  .section { padding: 56px 0; }
+  .section-heading { align-items: start; flex-direction: column; gap: 14px; }
+  .category-grid { gap: 10px; grid-template-columns: repeat(3, 1fr); }
+  .category-card { padding: 14px 8px; }
+  .service-grid, .feature-grid, .quote-grid { grid-template-columns: 1fr; }
+  .service-card { max-width: 500px; width: 100%; }
+  .footer-grid { grid-template-columns: repeat(2, 1fr); }
+  .signup-page { padding: 45px 0 58px; }
+  .signup-card { padding: 22px 17px; }
+  .account-types, .form-row { grid-template-columns: 1fr; }
+  .signup-intro > p:not(.eyebrow) { margin-bottom: 26px; }
+  .auth-page { min-height: auto; padding: 48px 0 58px; }
+  .auth-layout { gap: 32px; grid-template-columns: 1fr; }
+  .auth-intro h1 { font-size: clamp(2.35rem, 12vw, 3.5rem); }
+  .auth-card { padding: 23px 18px; }
+  .catalog-page { padding: 42px 0 58px; }
+  .catalog-heading { align-items: start; flex-direction: column; gap: 15px; }
+  .catalog-heading h1 { font-size: clamp(2rem, 10vw, 3.2rem); }
+  .catalog-layout { grid-template-columns: 1fr; }
+  .filters-panel { position: static; }
+  .provider-grid { grid-template-columns: 1fr; }
+  .category-pills { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 5px; }
+  .category-pill { flex: 0 0 auto; }
+  .profile-page { padding: 28px 0 58px; }
+  .profile-hero { align-items: start; flex-wrap: wrap; padding: 21px; }
+  .profile-avatar { height: 76px; width: 76px; font-size: 1.4rem; }
+  .profile-heading { min-width: calc(100% - 100px); }
+  .contact-button { width: 100%; }
+  .profile-grid { grid-template-columns: 1fr; }
+  .account-page-heading { align-items: start; flex-direction: column; gap: 14px; }
+  .account-layout { grid-template-columns: 1fr; }
+  .account-card { padding: 20px 17px; }
+  .empty-panel { padding: 35px 20px; }
+  .new-service-panel { padding: 17px; }
+}
+
+@media (max-width: 430px) {
+  .category-grid { grid-template-columns: repeat(2, 1fr); }
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 28px 18px; }
+}
