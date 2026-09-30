@@ -36,7 +36,7 @@ export const providers = [
 ];
 
 export const services = [
-	...providers.map((provider) => ({ id: provider.id, name: provider.serviceName, category: provider.category, categoryName: categories.find((category) => category.id === provider.category)?.name || provider.category, price: provider.price, priceUnit: provider.priceUnit, rating: provider.rating, providerId: provider.id, providerName: provider.name, initials: provider.initials, description: provider.description, visual: provider.category === "pets" ? "✦" : provider.category === "tecnologia" ? "⌘" : provider.category === "jardinagem" ? "❋" : "◈", tone: provider.category === "pets" ? "pink" : provider.category === "jardinagem" ? "green" : "" }))
+	...providers.map((provider) => ({ id: provider.id, name: provider.serviceName, category: provider.category, categoryName: categories.find((category) => category.id === provider.category)?.name || provider.category, price: provider.price, priceUnit: provider.priceUnit, rating: provider.rating, providerId: provider.id, providerName: provider.name, initials: provider.initials, description: provider.description, availability: provider.availability, verified: provider.verified, visual: provider.category === "pets" ? "✦" : provider.category === "tecnologia" ? "⌘" : provider.category === "jardinagem" ? "❋" : "◈", tone: provider.category === "pets" ? "pink" : provider.category === "jardinagem" ? "green" : "" }))
 ];
 
 export const reviews = [

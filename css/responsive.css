@@ -50,6 +50,14 @@
   .profile-heading { min-width: calc(100% - 100px); }
   .contact-button { width: 100%; }
   .profile-grid { grid-template-columns: 1fr; }
+  .booking-section { gap: 22px; grid-template-columns: 1fr; margin-top: 30px; padding-top: 28px; }
+  .calendar-card { padding: 16px 12px; }
+  .calendar-weekdays, .calendar-days { gap: 4px; }
+  .calendar-day { border-radius: 7px; font-size: .72rem; }
+  .calendar-dot { bottom: 3px; }
+  .booking-action { align-items: stretch; flex-direction: column; }
+  .booking-action .button { width: 100%; }
+  .booking-request-item { align-items: start; gap: 10px; }
   .account-page-heading { align-items: start; flex-direction: column; gap: 14px; }
   .account-layout { grid-template-columns: 1fr; }
   .account-card { padding: 20px 17px; }

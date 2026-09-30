@@ -1,7 +1,8 @@
 import { providers, users } from "./data.js";
 
 export function getUsers() {
-  return [...users, ...getStoredUsers()];
+  const profileUpdates = getStoredProfiles();
+  return [...users, ...getStoredUsers()].map((user) => ({ ...user, ...(profileUpdates[String(user.id)] || {}) }));
 }
 
 export function getProviders() {
@@ -26,6 +27,33 @@ export function saveRegisteredAccount(account) {
   storedUsers.push(account);
   localStorage.setItem("condoConnectUsers", JSON.stringify(storedUsers));
   return account;
+}
+
+function getStoredProfiles() {
+  try {
+    return JSON.parse(localStorage.getItem("condoConnectProfiles")) || {};
+  } catch {
+    return {};
+  }
+}
+
+export function getUserByProviderId(providerId) {
+  return getUsers().find((user) => user.type === "prestador" && String(user.providerId) === String(providerId)) || null;
+}
+
+export function saveUserProfile(user) {
+  const profiles = getStoredProfiles();
+  const { id, ...profile } = user;
+  profiles[String(id)] = { ...(profiles[String(id)] || {}), ...profile };
+  localStorage.setItem("condoConnectProfiles", JSON.stringify(profiles));
+
+  const storedUsers = getStoredUsers();
+  const storedIndex = storedUsers.findIndex((storedUser) => String(storedUser.id) === String(id));
+  if (storedIndex >= 0) {
+    storedUsers[storedIndex] = { ...storedUsers[storedIndex], ...profile };
+    localStorage.setItem("condoConnectUsers", JSON.stringify(storedUsers));
+  }
+  return { ...user };
 }
 
 export function saveLoggedUser(user) {

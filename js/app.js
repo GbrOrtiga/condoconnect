@@ -1,12 +1,60 @@
 import { categories, reviews } from "./data.js";
 import { searchServices, filterServices, getServiceById, getServices, saveRegisteredService } from "./services.js";
-import { authenticateUser, getLoggedUser, logoutUser, saveLoggedUser, saveRegisteredAccount } from "./users.js";
-import { formatCurrency, getElement, getQueryParam } from "./utils.js";
+import { authenticateUser, getLoggedUser, getUserByProviderId, logoutUser, saveLoggedUser, saveRegisteredAccount, saveUserProfile } from "./users.js";
+import { getBookingsForProvider, saveVisitRequest } from "./bookings.js";
+import { formatCurrency, getElement, getQueryParam, imageFileToDataUrl } from "./utils.js";
 
 const page = document.body.dataset.page;
 const app = getElement("#app");
 
 const icon = (name) => `<span aria-hidden="true">${name}</span>`;
+
+function renderAvatar(initials, photo, className = "profile-avatar") {
+  return `<div class="${className}"><img src="${photo || ""}" alt="" ${photo ? "" : "hidden"}><span ${photo ? "hidden" : ""}>${initials}</span></div>`;
+}
+
+function localDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function renderCalendarGrid(providerId, viewDate) {
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const monthStartOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const requestedDates = new Set(getBookingsForProvider(providerId).map((booking) => booking.date));
+  const monthLabel = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(viewDate);
+  const days = Array.from({ length: monthStartOffset }, () => `<span class="calendar-empty" aria-hidden="true"></span>`);
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(year, month, day);
+    const dateKey = localDateKey(date);
+    const isPast = date < today;
+    const isRequested = requestedDates.has(dateKey);
+    const classes = ["calendar-day", dateKey === localDateKey(today) ? "is-today" : "", isRequested ? "is-requested" : ""].filter(Boolean).join(" ");
+    days.push(`<button class="${classes}" type="button" data-calendar-date="${dateKey}" ${isPast || isRequested ? "disabled" : ""} aria-label="${day} ${monthLabel}${isRequested ? ", solicitado" : isPast ? ", indisponível" : ", disponível"}">${day}${isRequested ? `<span class="calendar-dot" aria-hidden="true"></span>` : ""}</button>`);
+  }
+
+  const currentDate = new Date();
+  const isCurrentMonth = year === currentDate.getFullYear() && month === currentDate.getMonth();
+  return `<div class="calendar-heading"><button class="calendar-nav" type="button" data-calendar-shift="-1" aria-label="Mês anterior" ${isCurrentMonth ? "disabled" : ""}>←</button><h3 id="calendar-month-label">${monthLabel}</h3><button class="calendar-nav" type="button" data-calendar-shift="1" aria-label="Próximo mês">→</button></div><div class="calendar-weekdays" aria-hidden="true"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div><div class="calendar-days">${days.join("")}</div>`;
+}
+
+function renderBookingCalendar(providerId, serviceId) {
+  return `<section class="booking-section" id="booking-section"><div class="booking-copy"><p class="eyebrow">Agende uma visita</p><h2>Escolha um dia</h2><p>Selecione uma data livre para enviar sua solicitação. O prestador confirmará o agendamento.</p><div class="calendar-legend"><span><i class="legend-open"></i>Disponível</span><span><i class="legend-requested"></i>Solicitado</span></div></div><div class="calendar-card"><div id="calendar-board" data-provider-id="${providerId}" data-service-id="${serviceId}"></div><div class="booking-feedback" id="booking-feedback" role="status"></div><div class="booking-action" id="booking-action" hidden><p>Data selecionada: <strong id="selected-visit-date"></strong></p><button class="button button-primary" id="request-visit-button" type="button">Solicitar visita</button></div>${getLoggedUser()?.type === "morador" ? "" : getLoggedUser()?.type === "prestador" ? `<p class="booking-login-note">Entre como morador para solicitar uma visita.</p>` : `<p class="booking-login-note"><a href="login.html">Entre como morador</a> para solicitar uma visita.</p>`}</div></section>`;
+}
+
+function renderBookingRequests(providerId) {
+  const user = getLoggedUser();
+  if (user?.type !== "prestador" || String(user.providerId) !== String(providerId)) return "";
+  const requests = getBookingsForProvider(providerId).sort((first, second) => first.date.localeCompare(second.date));
+  return `<section class="booking-requests"><div><p class="eyebrow">Área do prestador</p><h2>Solicitações recebidas</h2></div>${requests.length ? `<div class="booking-request-list">${requests.map((request) => { const [year, month, day] = request.date.split("-").map(Number); const dateLabel = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(new Date(year, month - 1, day)); return `<article class="booking-request-item"><div><strong>${request.residentName}</strong><span>${dateLabel}</span></div><span class="request-status">${request.status}</span></article>`; }).join("")}</div>` : `<p class="booking-empty">As solicitações de visita aparecerão aqui.</p>`}</section>`;
+}
 
 function renderHeader() {
   const sectionLink = (section) => page === "home" ? `#${section}` : `index.html#${section}`;
@@ -25,7 +73,7 @@ function renderCategories() {
 }
 
 function serviceCard(service) {
-  return `<article class="service-card"><div class="service-image ${service.tone}"><span class="service-visual-mark">${icon(service.visual)}</span><span class="service-category">${service.categoryName}</span></div><div class="service-content"><h3>${service.name}</h3><p class="service-description">${service.description}</p><div class="service-meta"><div class="service-provider"><span class="avatar">${service.initials}</span><span>${service.providerName}</span></div><div><div class="service-price">${formatCurrency(service.price)} <small>${service.priceUnit}</small></div><div class="rating">★ ${service.rating}</div></div></div></div></article>`;
+  return `<article class="service-card"><div class="service-image ${service.tone}"><span class="service-visual-mark">${icon(service.visual)}</span><span class="service-category">${service.categoryName}</span></div><div class="service-content"><h3>${service.name}</h3><p class="service-description">${service.description}</p><div class="service-meta"><div class="service-provider"><span class="avatar">${service.providerPhoto ? `<img src="${service.providerPhoto}" alt="">` : service.initials}</span><span>${service.providerName}</span></div><div><div class="service-price">${formatCurrency(service.price)} <small>${service.priceUnit}</small></div><div class="rating">★ ${service.rating}</div></div></div></div></article>`;
 }
 
 function renderServices(serviceList = getServices()) {
@@ -61,7 +109,8 @@ function renderUserProfile() {
   if (!user) return `${renderHeader()}<main class="profile-page"><div class="container empty-panel"><h1>Entre para acessar seu perfil</h1><p>Faça login para visualizar e editar suas informações.</p><a class="button button-primary" href="login.html">Entrar</a></div></main>${renderFooter()}`;
   const userServices = user.type === "prestador" ? getServices().filter((service) => String(service.providerId) === String(user.providerId)) : [];
   const residence = user.residenceType === "apartamento" ? `Apartamento ${user.apartmentNumber || ""}${user.block ? `, bloco ${user.block}` : ""}` : user.residenceType === "casa" ? `Casa ${user.houseNumber || ""}` : "Não informado";
-  return `${renderHeader()}<main class="profile-page"><div class="container"><div class="account-page-heading"><div><p class="eyebrow">Área pessoal</p><h1>Meu perfil</h1><p>Confira e atualize suas informações no CondoConnect.</p></div><span class="account-type-label">${user.type === "prestador" ? "Prestador de serviço" : "Morador"}</span></div><div class="account-layout"><section class="account-card"><div class="account-profile-head"><div class="profile-avatar">${user.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div><div><h2>${user.name}</h2><p>${user.email}</p></div></div><form id="profile-form" class="account-form"><div class="form-row"><label>Nome completo<input name="name" value="${user.name}" required></label><label>Telefone<input name="phone" value="${user.phone || ""}" placeholder="(00) 00000-0000"></label></div><div class="form-row"><label>Email<input value="${user.email}" disabled></label><label>Tipo de conta<input value="${user.type === "prestador" ? "Prestador de serviço" : "Morador"}" disabled></label></div>${user.type === "morador" ? `<div class="account-details"><strong>Residência</strong><span>${user.condominium || "Condomínio não informado"}</span><span>${residence}</span></div>` : ""}<button class="button button-primary" type="submit">Salvar alterações</button><p class="form-feedback" id="profile-feedback" role="status"></p></form></section><aside class="account-card account-summary"><p class="eyebrow">Resumo</p><div><small>Status da conta</small><strong class="status-positive">● Ativa</strong></div><div><small>Participação</small><strong>${user.type === "prestador" ? `${userServices.length} serviço${userServices.length === 1 ? "" : "s"} cadastrado${userServices.length === 1 ? "" : "s"}` : "Morador da comunidade"}</strong></div>${user.type === "prestador" ? `<a class="button button-secondary" href="meus-servicos.html">Gerenciar meus serviços</a>` : `<a class="button button-secondary" href="servicos.html">Encontrar serviços</a>`}</aside></div></div></main>${renderFooter()}`;
+  const initials = user.name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase();
+  return `${renderHeader()}<main class="profile-page"><div class="container"><div class="account-page-heading"><div><p class="eyebrow">Área pessoal</p><h1>Meu perfil</h1><p>Confira e atualize suas informações no CondoConnect.</p></div><span class="account-type-label">${user.type === "prestador" ? "Prestador de serviço" : "Morador"}</span></div><div class="account-layout"><section class="account-card"><div class="account-profile-head">${renderAvatar(initials, user.photo, "profile-avatar account-photo-preview")}<div><h2>${user.name}</h2><p>${user.email}</p></div></div><form id="profile-form" class="account-form"><div class="form-row"><label>Nome completo<input name="name" value="${user.name}" required></label><label>Telefone<input name="phone" value="${user.phone || ""}" placeholder="(00) 00000-0000"></label></div><div class="form-row"><label>Email<input value="${user.email}" disabled></label><label>Tipo de conta<input value="${user.type === "prestador" ? "Prestador de serviço" : "Morador"}" disabled></label></div>${user.type === "prestador" ? `<label>Bio profissional<textarea name="bio" rows="4" maxlength="500" placeholder="Conte um pouco sobre você e seu trabalho">${user.bio || ""}</textarea><small class="field-hint">Até 500 caracteres.</small></label>` : `<div class="account-details"><strong>Residência</strong><span>${user.condominium || "Condomínio não informado"}</span><span>${residence}</span></div>`}<label class="photo-upload-label">Foto de perfil<input id="profile-photo" name="photoFile" type="file" accept="image/*"><small class="field-hint">Imagem de até 1,5 MB.</small></label><button class="button button-primary" type="submit">Salvar alterações</button><p class="form-feedback" id="profile-feedback" role="status"></p></form></section><aside class="account-card account-summary"><p class="eyebrow">Resumo</p><div><small>Status da conta</small><strong class="status-positive">● Ativa</strong></div><div><small>Participação</small><strong>${user.type === "prestador" ? `${userServices.length} serviço${userServices.length === 1 ? "" : "s"} cadastrado${userServices.length === 1 ? "" : "s"}` : "Morador da comunidade"}</strong></div>${user.type === "prestador" ? `<a class="button button-secondary" href="meus-servicos.html">Gerenciar meus serviços</a>` : `<a class="button button-secondary" href="servicos.html">Encontrar serviços</a>`}</aside></div></div></main>${renderFooter()}`;
 }
 
 function renderMyServices() {
@@ -80,14 +129,15 @@ function renderServiceBrowser() {
 }
 
 function providerCard(service) {
-  return `<article class="provider-card"><div class="provider-card-image ${service.tone}"><span class="provider-initials">${service.initials}</span><span class="provider-category">${service.categoryName}</span></div><div class="provider-card-content"><div class="provider-card-title"><div><h2>${service.providerName} ${service.verified ? `<span class="verified-badge" title="Prestador verificado">✓</span>` : ""}</h2><p>${service.name}</p></div><span class="provider-rating">★ ${service.rating}</span></div><p class="provider-card-description">${service.description}</p><div class="provider-card-meta"><strong>${formatCurrency(service.price)}</strong><small>${service.priceUnit}</small><a class="button button-secondary" href="prestador.html?id=${service.providerId}">Ver perfil</a></div></div></article>`;
+  return `<article class="provider-card"><div class="provider-card-image ${service.tone}">${service.providerPhoto ? `<img class="provider-cover-photo" src="${service.providerPhoto}" alt="Foto de ${service.providerName}">` : `<span class="provider-initials">${service.initials}</span>`}<span class="provider-category">${service.categoryName}</span></div><div class="provider-card-content"><div class="provider-card-title"><div><h2>${service.providerName} ${service.verified ? `<span class="verified-badge" title="Prestador verificado">✓</span>` : ""}</h2><p>${service.name}</p></div><span class="provider-rating">★ ${service.rating}</span></div><p class="provider-card-description">${service.description}</p><div class="provider-card-meta"><strong>${formatCurrency(service.price)}</strong><small>${service.priceUnit}</small><a class="button button-secondary" href="prestador.html?id=${service.providerId}">Ver perfil</a></div></div></article>`;
 }
 
 function renderProviderProfile() {
   const service = getServiceById(getQueryParam("id")) || getServices()[0];
   const providerReviews = reviews.filter((review) => review.providerId === service.providerId);
-  const provider = { name: service.providerName, initials: service.initials, serviceName: service.name, categoryName: service.categoryName, verified: service.providerId !== 6 && service.providerId !== 8 && service.providerId !== 11, rating: service.rating, reviewCount: providerReviews.length || 1, price: service.price, priceUnit: service.priceUnit, description: service.description, availability: service.providerId === 1 ? ["Segunda", "Quarta", "Sexta"] : ["Segunda a sexta"] };
-  return `${renderHeader()}<main class="profile-page"><div class="container"><a class="back-link" href="servicos.html">← Voltar para serviços</a><section class="profile-hero"><div class="profile-avatar">${provider.initials}</div><div class="profile-heading"><p class="eyebrow">Perfil do prestador</p><h1>${provider.name} ${provider.verified ? `<span class="verified-label">✓ Verificado</span>` : ""}</h1><p>${provider.serviceName} · ${provider.categoryName}</p><div class="profile-rating">★ ${provider.rating} <span>(${provider.reviewCount} avaliações)</span></div></div><button class="button button-primary contact-button" id="contact-provider" type="button">Entrar em contato</button></section><div class="profile-grid"><section class="profile-main"><div class="profile-section"><p class="eyebrow">Sobre o serviço</p><h2>${provider.serviceName}</h2><p>${provider.description}</p></div><div class="profile-section"><p class="eyebrow">Avaliações</p><div class="review-list">${(providerReviews.length ? providerReviews : [{ author: "Comunidade CondoConnect", initials: "CC", rating: provider.rating, text: "Este prestador está começando a receber avaliações da comunidade." }]).map((review) => `<article class="review-item"><div class="review-item-head"><span class="avatar">${review.initials}</span><div><strong>${review.author}</strong><small>★ ${review.rating}</small></div></div><p>${review.text}</p></article>`).join("")}</div></div></section><aside class="profile-side"><div class="profile-info-card"><div><small>Preço</small><strong>${formatCurrency(provider.price)}</strong><span>${provider.priceUnit}</span></div><div><small>Disponibilidade</small><strong class="availability-list">${provider.availability.map((day) => `<span>${day}</span>`).join("")}</strong></div></div></aside></div></div></main>${renderFooter()}`;
+  const providerAccount = getUserByProviderId(service.providerId);
+  const provider = { id: service.providerId, serviceId: service.id, name: service.providerName, initials: service.initials, photo: providerAccount?.photo || service.providerPhoto || "", bio: providerAccount?.bio || service.description, serviceName: service.name, categoryName: service.categoryName, verified: providerAccount?.verified ?? service.verified ?? ![6, 8, 11].includes(Number(service.providerId)), rating: service.rating, reviewCount: providerReviews.length, price: service.price, priceUnit: service.priceUnit, description: service.description, availability: service.availability || providerAccount?.availability || ["Segunda a sexta"] };
+  return `${renderHeader()}<main class="profile-page"><div class="container"><a class="back-link" href="servicos.html">← Voltar para serviços</a><section class="profile-hero">${renderAvatar(provider.initials, provider.photo, "profile-avatar")}<div class="profile-heading"><p class="eyebrow">Perfil do prestador</p><h1>${provider.name} ${provider.verified ? `<span class="verified-label">✓ Verificado</span>` : ""}</h1><p>${provider.serviceName} · ${provider.categoryName}</p><div class="profile-rating">★ ${provider.rating} <span>(${provider.reviewCount} avaliações)</span></div></div><button class="button button-primary contact-button" id="contact-provider" type="button">Entrar em contato</button></section><div class="profile-grid"><section class="profile-main"><div class="profile-section"><p class="eyebrow">Sobre o prestador</p><h2>${provider.name}</h2><p>${provider.bio}</p><div class="profile-service-summary"><strong>${provider.serviceName}</strong><span>${formatCurrency(provider.price)} ${provider.priceUnit}</span></div></div><div class="profile-section"><p class="eyebrow">Avaliações</p><div class="review-list">${(providerReviews.length ? providerReviews : [{ author: "Comunidade CondoConnect", initials: "CC", rating: provider.rating, text: "Este prestador está começando a receber avaliações da comunidade." }]).map((review) => `<article class="review-item"><div class="review-item-head"><span class="avatar">${review.initials}</span><div><strong>${review.author}</strong><small>★ ${review.rating}</small></div></div><p>${review.text}</p></article>`).join("")}</div></div></section><aside class="profile-side"><div class="profile-info-card"><div><small>Disponibilidade informada</small><strong class="availability-list">${provider.availability.map((day) => `<span>${day}</span>`).join("")}</strong></div><div><small>A partir de</small><strong>${formatCurrency(provider.price)}</strong><span>${provider.priceUnit}</span></div></div></aside></div>${renderBookingCalendar(provider.id, provider.serviceId)}${renderBookingRequests(provider.id)}</div></main>${renderFooter()}`;
 }
 
 function renderSignup() {
@@ -181,9 +231,9 @@ function bindSignupV2Events() {
     if (form.elements.password.value !== form.elements.passwordConfirmation.value) { feedback.className = "form-feedback is-error"; feedback.textContent = "As senhas precisam ser iguais."; return; }
     const isProvider = form.elements.accountType.value === "prestador";
     const accountId = Date.now();
-    const account = { id: accountId, name: form.elements.name.value.trim(), email: form.elements.email.value.trim(), password: form.elements.password.value, type: form.elements.accountType.value, phone: isProvider ? form.elements.phone.value.trim() : form.elements.residentPhone.value.trim(), condominium: isProvider ? "" : form.elements.condominium.value.trim(), residenceType: isProvider ? "" : form.elements.residenceType.value, houseNumber: isProvider ? "" : form.elements.houseNumber.value.trim(), block: isProvider ? "" : form.elements.block.value.trim(), apartmentNumber: isProvider ? "" : form.elements.apartmentNumber.value.trim(), providerId: isProvider ? accountId : null };
+    const account = { id: accountId, name: form.elements.name.value.trim(), email: form.elements.email.value.trim(), password: form.elements.password.value, type: form.elements.accountType.value, phone: isProvider ? form.elements.phone.value.trim() : form.elements.residentPhone.value.trim(), condominium: isProvider ? "" : form.elements.condominium.value.trim(), residenceType: isProvider ? "" : form.elements.residenceType.value, houseNumber: isProvider ? "" : form.elements.houseNumber.value.trim(), block: isProvider ? "" : form.elements.block.value.trim(), apartmentNumber: isProvider ? "" : form.elements.apartmentNumber.value.trim(), providerId: isProvider ? accountId : null, bio: isProvider ? form.elements.serviceDescription.value.trim() : "", photo: "" };
     saveRegisteredAccount(account);
-    if (isProvider) { const selectedCategory = categories.find((category) => category.id === form.elements.category.value); saveRegisteredService({ id: accountId, name: form.elements.serviceName.value.trim(), category: form.elements.category.value, categoryName: selectedCategory?.name || "Outros", price: Number(form.elements.price.value), priceUnit: "a partir de", rating: 0, providerId: accountId, providerName: account.name, initials: account.name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase(), description: form.elements.serviceDescription.value.trim(), visual: "✦", tone: "" }); }
+    if (isProvider) { const selectedCategory = categories.find((category) => category.id === form.elements.category.value); saveRegisteredService({ id: accountId, name: form.elements.serviceName.value.trim(), category: form.elements.category.value, categoryName: selectedCategory?.name || "Outros", price: Number(form.elements.price.value), priceUnit: "a partir de", rating: 0, providerId: accountId, providerName: account.name, initials: account.name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase(), description: form.elements.serviceDescription.value.trim(), availability: [form.elements.availability.value.trim()], visual: "✦", tone: "" }); }
     feedback.className = "form-feedback is-success";
     feedback.textContent = `Cadastro de ${form.elements.accountType.value} salvo localmente. Você já pode entrar com seus dados.`;
   });
@@ -212,20 +262,95 @@ function bindProfileEvents() {
   const menu = getElement("#mobile-menu");
   menu?.addEventListener("click", () => { const navigation = getElement("#main-nav"); const isOpen = navigation.classList.toggle("is-open"); menu.setAttribute("aria-expanded", String(isOpen)); });
   getElement("#contact-provider")?.addEventListener("click", () => window.alert("O contato será implementado quando o back-end estiver conectado."));
+
+  const calendar = getElement("#calendar-board");
+  if (!calendar) return;
+  const providerId = calendar.dataset.providerId;
+  const serviceId = calendar.dataset.serviceId;
+  let viewDate = new Date();
+  let selectedDate = "";
+  const renderCalendar = () => { calendar.innerHTML = renderCalendarGrid(providerId, viewDate); };
+  const feedback = getElement("#booking-feedback");
+  calendar.addEventListener("click", (event) => {
+    const shiftButton = event.target.closest("[data-calendar-shift]");
+    if (shiftButton) {
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + Number(shiftButton.dataset.calendarShift), 1);
+      selectedDate = "";
+      getElement("#booking-action").hidden = true;
+      renderCalendar();
+      return;
+    }
+    const dayButton = event.target.closest("[data-calendar-date]");
+    if (!dayButton || dayButton.disabled) return;
+    const resident = getLoggedUser();
+    if (!resident || resident.type !== "morador") {
+      feedback.textContent = resident?.type === "prestador" ? "Entre com uma conta de morador para solicitar uma visita." : "Entre na sua conta de morador para solicitar uma visita.";
+      return;
+    }
+    if (String(resident.providerId) === String(providerId)) {
+      feedback.textContent = "Você não pode solicitar uma visita ao seu próprio perfil de prestador.";
+      return;
+    }
+    selectedDate = dayButton.dataset.calendarDate;
+    const [year, month, day] = selectedDate.split("-").map(Number);
+    getElement("#selected-visit-date").textContent = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(new Date(year, month - 1, day));
+    getElement("#booking-action").hidden = false;
+    feedback.textContent = "";
+  });
+  getElement("#request-visit-button")?.addEventListener("click", () => {
+    const resident = getLoggedUser();
+    if (!resident || !selectedDate) return;
+    const result = saveVisitRequest({ providerId, serviceId, date: selectedDate, resident });
+    if (!result.saved) {
+      feedback.textContent = "Essa data acabou de ser solicitada. Escolha outro dia disponível.";
+      renderCalendar();
+      return;
+    }
+    getElement("#booking-action").hidden = true;
+    selectedDate = "";
+    feedback.className = "booking-feedback is-success";
+    feedback.textContent = "Solicitação enviada! O prestador verá o pedido no calendário.";
+    renderCalendar();
+  });
+  renderCalendar();
 }
 
 function bindUserProfileEvents() {
   const form = getElement("#profile-form");
-  form?.addEventListener("submit", (event) => {
+  let selectedPhoto = getLoggedUser()?.photo || "";
+  getElement("#profile-photo")?.addEventListener("change", async (event) => {
+    const feedback = getElement("#profile-feedback");
+    const file = event.currentTarget.files[0];
+    if (!file) return;
+    try {
+      selectedPhoto = await imageFileToDataUrl(file);
+      getElement(".account-photo-preview img").src = selectedPhoto;
+      getElement(".account-photo-preview img").hidden = false;
+      getElement(".account-photo-preview span").hidden = true;
+      feedback.textContent = "Prévia carregada. Salve as alterações para manter a foto.";
+      feedback.className = "form-feedback";
+    } catch (error) {
+      event.currentTarget.value = "";
+      feedback.textContent = error.message;
+      feedback.className = "form-feedback is-error";
+    }
+  });
+  form?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const user = getLoggedUser();
-    const storedUsers = JSON.parse(localStorage.getItem("condoConnectUsers") || "[]");
-    const updatedUser = { ...user, name: form.elements.name.value.trim(), phone: form.elements.phone.value.trim() };
-    const index = storedUsers.findIndex((item) => item.id === user.id);
-    if (index >= 0) { storedUsers[index] = { ...storedUsers[index], ...updatedUser }; localStorage.setItem("condoConnectUsers", JSON.stringify(storedUsers)); }
+    const feedback = getElement("#profile-feedback");
+    const photoFile = form.elements.photoFile.files[0];
+    if (photoFile && !selectedPhoto) {
+      try { selectedPhoto = await imageFileToDataUrl(photoFile); }
+      catch (error) { feedback.className = "form-feedback is-error"; feedback.textContent = error.message; return; }
+    }
+    const updatedUser = { ...user, name: form.elements.name.value.trim(), phone: form.elements.phone.value.trim(), photo: selectedPhoto };
+    if (user.type === "prestador") updatedUser.bio = form.elements.bio.value.trim();
+    saveUserProfile(updatedUser);
     saveLoggedUser(updatedUser);
-    getElement("#profile-feedback").className = "form-feedback is-success";
-    getElement("#profile-feedback").textContent = "Alterações salvas localmente.";
+    getElement(".account-profile-head h2").textContent = updatedUser.name;
+    feedback.className = "form-feedback is-success";
+    feedback.textContent = "Alterações salvas localmente.";
   });
   const menu = getElement("#mobile-menu");
   menu?.addEventListener("click", () => { const navigation = getElement("#main-nav"); const isOpen = navigation.classList.toggle("is-open"); menu.setAttribute("aria-expanded", String(isOpen)); });

@@ -1,4 +1,5 @@
 import { services } from "./data.js";
+import { getUserByProviderId } from "./users.js";
 
 function getStoredServices() {
   try {
@@ -9,7 +10,16 @@ function getStoredServices() {
 }
 
 export function getServices() {
-  return [...services, ...getStoredServices()];
+  return [...services, ...getStoredServices()].map((service) => {
+    const provider = getUserByProviderId(service.providerId);
+    return provider ? {
+      ...service,
+      providerName: provider.name,
+      initials: provider.name.split(" ").filter(Boolean).map((part) => part[0]).slice(0, 2).join("").toUpperCase(),
+      providerPhoto: provider.photo || "",
+      verified: provider.verified ?? service.verified ?? false
+    } : service;
+  });
 }
 
 export function searchServices(query, serviceList = getServices()) {
