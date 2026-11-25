@@ -131,7 +131,7 @@ button { cursor: pointer; }
 .site-footer .brand-mark { background: white; color: var(--color-primary-dark); }
 .footer-copy { color: #a9c1cf; font-size: .82rem; max-width: 250px; }
 .footer-column h3 { color: white; font-size: .8rem; margin: 0 0 14px; }
-.footer-column a { color: #a9c1cf; display: block; font-size: .78rem; margin-bottom: 10px; }
+.footer-column a, .footer-column .footer-placeholder { color: #a9c1cf; display: block; font-size: .78rem; margin-bottom: 10px; }
 .footer-column a:hover { color: white; }
 .footer-bottom { border-top: 1px solid rgba(255,255,255,.15); color: #a9c1cf; font-size: .72rem; margin-top: 40px; padding-top: 20px; }
 
@@ -173,7 +173,7 @@ button { cursor: pointer; }
 .provider-fields { border-left: 3px solid var(--color-primary-soft); display: grid; gap: 16px; padding-left: 15px; }
 .terms-check { align-items: start; display: flex !important; font-size: .7rem !important; font-weight: 400 !important; gap: 8px !important; grid-template-columns: auto 1fr; line-height: 1.45; }
 .terms-check input { accent-color: var(--color-primary); margin-top: 3px; }
-.terms-check a, .signin-prompt a { color: var(--color-primary); font-weight: 800; }
+.terms-check a, .terms-check .terms-link-placeholder, .signin-prompt a { color: var(--color-primary); font-weight: 800; }
 .signup-submit { min-height: 48px; width: 100%; }
 .form-feedback { font-size: .76rem; margin: -3px 0 0; min-height: 18px; }
 .form-feedback.is-error { color: var(--color-danger); }
@@ -199,7 +199,7 @@ button { cursor: pointer; }
 .password-field { position: relative; }
 .password-field input { padding-right: 70px; }
 .password-field button { background: transparent; border: 0; color: var(--color-primary); font-size: .72rem; font-weight: 800; padding: 8px; position: absolute; right: 5px; top: 5px; }
-.forgot-link { color: var(--color-primary); font-size: .75rem; font-weight: 800; justify-self: end; margin-top: -7px; }
+.forgot-link { background: none; border: 0; color: var(--color-primary); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 800; justify-self: end; margin-top: -7px; padding: 0; }
 .auth-submit { min-height: 48px; width: 100%; }
 
 .catalog-page { padding: 62px 0 86px; }
@@ -351,6 +351,7 @@ button { cursor: pointer; }
 
 @media (max-width: 980px) {
   .category-grid { grid-template-columns: repeat(5, 1fr); }
+  .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-grid { grid-template-columns: 1fr; }
   .hero-visual { margin: 0 auto; max-width: 500px; width: 100%; }
   .signup-layout { gap: 35px; grid-template-columns: 1fr; }
